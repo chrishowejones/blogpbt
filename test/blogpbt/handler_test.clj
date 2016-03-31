@@ -83,8 +83,10 @@
 (deftest test-get-customer-exists
   (chuck/checking "checking that customer exists" 1000
                   [cust customer]
-                  (let [id (extract-location-id (post-helper-json "/customers" {:customer cust}))]
-                    (is (= 200 (:status (get-helper-json (str "/customers/" id))))))))
+                  (let [id (extract-location-id (post-helper-json "/customers" {:customer cust}))
+                        customer-retrieved (get-helper-json (str "/customers/" id))]
+                    (is (= 200 (:status customer-retrieved)))
+                    (is (= cust (dissoc (parse-string (:body customer-retrieved) true) :id))))))
 
 (defspec test-get-customer-not-exists
   1000

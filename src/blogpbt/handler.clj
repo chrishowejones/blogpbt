@@ -8,6 +8,9 @@
 
 (def datastore (atom {:customers {}}))
 
+(def not-found
+  (resp/status (resp/response "Not found") 404))
+
 (defn- store-customer
   [customer]
   (let [uuid (str (java.util.UUID/randomUUID))
@@ -15,12 +18,16 @@
     (swap! datastore assoc-in [:customers uuid] cust-with-id)
     cust-with-id))
 
-(defroutes app-routes
-  (GET "/customers/:id" [id]
-       (let [customer-found (get-in @datastore [:customers id])]
+(defn- get-customer
+  [id]
+  (let [customer-found (get-in @datastore [:customers id])]
          (if customer-found
            (resp/content-type (resp/response customer-found) "application/json")
-           (resp/status (resp/response "Not found") 404))))
+           not-found)))
+
+(defroutes app-routes
+  (GET "/customers/:id" [id]
+       (get-customer id))
   (POST "/customers" [customer]
         (let [stored-customer (store-customer customer)]
           (-> (resp/created (str "/customers/" (:id stored-customer)) stored-customer)
