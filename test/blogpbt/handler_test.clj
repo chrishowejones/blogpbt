@@ -1,25 +1,15 @@
 (ns blogpbt.handler-test
-  (:require [clojure.test :refer :all]
-            [ring.mock.request :as mock]
-            [blogpbt.handler :refer :all]
-            [clojure.test.check.clojure-test :refer [defspec]]
+  (:require [blogpbt
+             [generators :refer [customer]]
+             [handler :refer :all]
+             [test-utils :refer [get-resource-json post-resource-json]]]
+            [clojure.test :refer :all]
+            [clojure.test.check
+             [clojure-test :refer [defspec]]
+             [generators :as gen]
+             [properties :as prop]]
             [com.gfredericks.test.chuck.clojure-test :as chuck]
-            [clojure.test.check.properties :as prop]
-            [clojure.string :as str]
-            [blogpbt.generators :refer [customer]]
-            [ring.mock.request :as mock]
-            [cheshire.core :refer [generate-string parse-string]]
-            [clojure.test.check.generators :as gen]
-            [clojure.test.check :as tc]))
-
-(defn- post-helper-json [url entity]
-             (let [request (mock/content-type (mock/request :post url (generate-string entity)) "application/json")]
-               (app request)))
-
-(defn- get-helper-json [url]
-  (-> (mock/request :get url)
-      (assoc-in [:headers "Accept"] "application/json")
-      app))
+            [ring.mock.request :as mock]))
 
 (defn- extract-location-id
   [response]
@@ -27,24 +17,24 @@
 
 (deftest test-app
   (testing "customer post route"
-    (let [response (post-helper-json "/customers" {:customer {:name "Fred"}})]
+    (let [response (post-resource-json "/customers" {:customer {:name "Fred"}})]
       (is (= (:status response) 201))
-      (is (= (into {:id (extract-location-id response)} {:name "Fred"}) (parse-string (:body response) true)))))
+      (is (= (into {:id (extract-location-id response)} {:name "Fred"}) (:body response)))))
 
   (testing "customer get route"
     (let [id (->
-              (post-helper-json "/customers" {:customer {:name "Fred"}})
+              (post-resource-json "/customers" {:customer {:name "Fred"}})
               (extract-location-id))
-          response (get-helper-json (str "/customers/" id))]
+          response (get-resource-json (str "/customers/" id))]
       (is (= (:status response) 200))
-      (is (= (parse-string (:body response) true) {:id id :name "Fred"}))))
+      (is (= (:body response) {:id id :name "Fred"}))))
 
   (testing "not-found route"
     (let [response (app (mock/request :get "/invalid"))]
       (is (= (:status response) 404)))))
 
 (deftest test-customer
-  (let [response (post-helper-json "/customers" {:customer {:name "", :email "p9@googlemail.com", :age 48}})]
+  (let [response (post-resource-json "/customers" {:customer {:name "", :email "p9@googlemail.com", :age 48}})]
     (is (= 201 (:status response)))
     (is (not (nil? (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"]))))))))
 
@@ -53,19 +43,17 @@
 (defspec test-post-customer-status-created
   1000
   (prop/for-all [cust customer]
-                (let [response (post-helper-json "/customers" {:customer cust})]
+                (let [response (post-resource-json "/customers" {:customer cust})]
                   (= 201 (:status response))))) ;; status should be 'created'
 
 (defspec test-post-customer-location-created
   1000
   (prop/for-all [cust customer]
-                (let [response (post-helper-json "/customers" {:customer cust})
+                (let [response (post-resource-json "/customers" {:customer cust})
                       location-id (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"])))]
                   (and
                    (not (nil? location-id))
-                   (= (-> (:body response)
-                          (parse-string true)
-                          :id)
+                   (= (:id (:body response))
                       location-id)))))
 
 
@@ -73,9 +61,9 @@
 (defspec test-post-customer-already-created
   1000
   (prop/for-all [cust customer]
-                (let [response (post-helper-json "/customers" {:customer cust})
+                (let [response (post-resource-json "/customers" {:customer cust})
                       id (extract-location-id response)]
-                  (let [snd-response (post-helper-json "/customers" {:customer cust})]
+                  (let [snd-response (post-resource-json "/customers" {:customer cust})]
                     (= 201 (:status snd-response))
                     (not= id (extract-location-id snd-response))) ; post is not idempotent
                   )))
@@ -83,15 +71,15 @@
 (deftest test-get-customer-exists
   (chuck/checking "checking that customer exists" 1000
                   [cust customer]
-                  (let [id (extract-location-id (post-helper-json "/customers" {:customer cust}))
-                        customer-retrieved (get-helper-json (str "/customers/" id))]
+                  (let [id (extract-location-id (post-resource-json "/customers" {:customer cust}))
+                        customer-retrieved (get-resource-json (str "/customers/" id))]
                     (is (= 200 (:status customer-retrieved)))
-                    (is (= cust (dissoc (parse-string (:body customer-retrieved) true) :id))))))
+                    (is (= cust (dissoc (:body customer-retrieved) :id))))))
 
 (defspec test-get-customer-not-exists
   1000
   (prop/for-all [id gen/int]
-                (let [response (get-helper-json (str "/customers/" id))]
+                (let [response (get-resource-json (str "/customers/" id))]
                   (is (= 404 (:status response)) (str "Expected status 404 got " (:status response))))))
 
 

@@ -13,4 +13,5 @@
                         [ring/ring-mock "0.3.0"]
                         [cheshire "5.5.0"]
                         [org.clojure/test.check "0.9.0"]
-                        [com.gfredericks/test.chuck "0.2.6"]]}})
+                        [com.gfredericks/test.chuck "0.2.6"]
+                        [mdrogalis/stateful-check "0.3.2"]]}})
