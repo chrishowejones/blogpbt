@@ -2,7 +2,7 @@
   (:require [blogpbt
              [generators :refer [customer]]
              [handler :refer :all]
-             [test-utils :refer [get-resource-json post-resource-json]]]
+             [test-utils :refer [extract-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer :all]
             [clojure.test.check
              [clojure-test :refer [defspec]]
@@ -10,10 +10,6 @@
              [properties :as prop]]
             [com.gfredericks.test.chuck.clojure-test :as chuck]
             [ring.mock.request :as mock]))
-
-(defn- extract-location-id
-  [response]
-  (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"]))))
 
 (deftest test-app
   (testing "customer post route"

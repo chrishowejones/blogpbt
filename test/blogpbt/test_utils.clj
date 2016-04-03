@@ -1,8 +1,8 @@
 (ns blogpbt.test-utils
-  (:require [blogpbt.handler :refer :all]
-            [ring.mock.request :as mock]
+  (:require [blogpbt
+             [handler :refer :all]]
             [cheshire.core :refer [generate-string parse-string]]
-            [clojure.string :as str]))
+            [ring.mock.request :as mock]))
 
 (defn- parse-json-body
   [response]
@@ -23,3 +23,7 @@
       (assoc-in [:headers "Accept"] "application/json")
       app
       (parse-json-body)))
+
+(defn extract-location-id
+  [response]
+  (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"]))))
