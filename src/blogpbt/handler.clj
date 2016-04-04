@@ -1,9 +1,10 @@
 (ns blogpbt.handler
-  (:require [compojure.core :refer :all]
-            [compojure.route :as route]
-            [compojure.handler :as handler]
-            [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-            [ring.middleware.json :refer [wrap-json-params wrap-json-response wrap-json-body]]
+  (:require [compojure
+             [core :refer :all]
+             [route :as route]]
+            [ring.middleware
+             [defaults :refer [api-defaults wrap-defaults]]
+             [json :refer [wrap-json-params wrap-json-response]]]
             [ring.util.response :as resp]))
 
 (def datastore (atom {:customers {}}))
@@ -35,7 +36,7 @@
   (route/not-found "Not Found"))
 
 (def app
-  (-> (handler/api app-routes)
+  (-> (wrap-defaults app-routes api-defaults)
       wrap-json-params
       wrap-json-response))
 
@@ -43,7 +44,7 @@
 
   (-> (resp/created "/customers" (store-customer {:name "jim"}))
       (resp/content-type "application/json"))
-  (swap! datastore assoc-in [:customers "1"] {:name "fred"})
+  (swap! datastore assoc-in [:customers "1"] {:name "fred" :age 30})
 
   (app (ring.mock.request/request :get "/customers/1"))
   (app (ring.mock.request/content-type (ring.mock.request/request :post "/customers" (cheshire.core/generate-string {:customer {:name "bob"}})) "application/json"))

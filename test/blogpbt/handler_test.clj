@@ -76,11 +76,12 @@
                     (is (= 200 (:status customer-retrieved)))
                     (is (= cust (dissoc (:body customer-retrieved) :id))))))
 
-(defspec test-get-customer-not-exists
-  1000
-  (prop/for-all [id gen/int]
-                (let [response (get-resource-json (str "/customers/" id))]
-                  (is (= 404 (:status response)) (str "Expected status 404 got " (:status response))))))
+(deftest test-get-customer-not-exists
+  (chuck/checking "checking that customer doesn't exist"
+                  1000
+                  [id gen/int]
+                  (let [response (get-resource-json (str "/customers/" id))]
+                    (is (= 404 (:status response)) (str "Expected status 404 got " (:status response))))))
 
 
 (comment
