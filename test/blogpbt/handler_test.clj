@@ -32,7 +32,7 @@
 (deftest test-customer
   (let [response (post-resource-json "/customers" {:customer {:name "", :email "p9@googlemail.com", :age 48}})]
     (is (= 201 (:status response)))
-    (is (not (nil? (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"]))))))))
+    (is (not (nil? (extract-location-id response))))))
 
 ;; Property based tests
 
@@ -46,7 +46,7 @@
   1000
   (prop/for-all [cust customer]
                 (let [response (post-resource-json "/customers" {:customer cust})
-                      location-id (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"])))]
+                      location-id (extract-location-id response)]
                   (and
                    (not (nil? location-id))
                    (= (:id (:body response))
@@ -60,8 +60,8 @@
                 (let [response (post-resource-json "/customers" {:customer cust})
                       id (extract-location-id response)]
                   (let [snd-response (post-resource-json "/customers" {:customer cust})]
-                    (= 201 (:status snd-response))
-                    (not= id (extract-location-id snd-response))) ; post is not idempotent
+                    (and (= 201 (:status snd-response))
+                         (not= id (extract-location-id snd-response)))) ; post is not idempotent
                   )))
 
 (deftest test-get-customer-exists
@@ -72,11 +72,12 @@
                     (is (= 200 (:status customer-retrieved)))
                     (is (= cust (dissoc (:body customer-retrieved) :id))))))
 
-(defspec test-get-customer-not-exists
-  1000
-  (prop/for-all [id gen/int]
-                (let [response (get-resource-json (str "/customers/" id))]
-                  (is (= 404 (:status response)) (str "Expected status 404 got " (:status response))))))
+(deftest test-get-customer-not-exists
+  (chuck/checking "checking that customer doesn't exist"
+                  1000
+                  [id gen/int]
+                  (let [response (get-resource-json (str "/customers/" id))]
+                    (is (= 404 (:status response)) (str "Expected status 404 got " (:status response))))))
 
 
 (comment
