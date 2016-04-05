@@ -5,7 +5,16 @@
             [ring.middleware
              [defaults :refer [api-defaults wrap-defaults]]
              [json :refer [wrap-json-params wrap-json-response]]]
-            [ring.util.response :as resp]))
+            [ring.util.response :as resp]
+            [taoensso.timbre :as timbre :refer [debug]]
+            [taoensso.timbre.appenders.core :as core-appenders]))
+
+(def timbre-config
+  {:level     :info
+   :appenders
+   {:println (core-appenders/println-appender {:stream :auto})}})
+
+(timbre/set-config! timbre-config)
 
 (def datastore (atom {:customers {}}))
 
@@ -28,11 +37,11 @@
 
 (defroutes app-routes
   (GET "/customers/:id" [id]
-       (println "get = " id)
+       (debug "get customer for id:" id)
        (get-customer id))
   (POST "/customers" [customer]
         (let [stored-customer (store-customer customer)]
-          (println "Customer posted for id = " (:id stored-customer))
+          (debug "Customer posted for id:" (:id stored-customer))
           (-> (resp/created (str "/customers/" (:id stored-customer)) stored-customer)
               (resp/content-type  "application/json"))))
   (route/not-found "Not Found"))
