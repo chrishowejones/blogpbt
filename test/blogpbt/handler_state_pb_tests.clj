@@ -46,12 +46,26 @@
 
 ;; stateful tests of customers api
 
-;; model customer data in map - initial state is map of the model of customers
+;; helper functions to call post and get with a single argument
+(defn get-customer
+  [id]
+  (get-resource-json (str "/customers/" id)))
+
+(defn post-customer
+  [customer]
+  (post-resource-json (str "/customers") customer))
+
+;; model server side customer state data in a map
+;; The map will contain a vector of generated customer maps and a vector of customer ids
+;; returned from calls to POST on the server.
+;; i.e.
+;; {:customers [{:name "Jane" :email "Jane@yahoo.com" :age 44} {:name "Fred" :email "fred@gmail.com" :age 31}]
+;;  :customer-ids ["f64dcd17-e5d8-4219-b101-eba94f1ddaff" "d26c9ed4-dbf3-4525-9946-aaa794d1fe6e"]
 
 (def post-customer-specification
   {:model/args (fn [state]
-                 [(gen/return "/customers") (gen/fmap (fn [cust] {:customer cust}) customer)])
-   :real/command #'post-resource-json
+                 [(gen/fmap (fn [cust] {:customer cust}) customer)])
+   :real/command #'post-customer
    :next-state (fn [state _ response]
                  (let [new-state (update-in state [:customers] conj (:body response))]
                    (update-in new-state [:customer-ids] conj (:id (:body response)))))
@@ -59,12 +73,8 @@
                          (and
                           (= 201 (:status response))
                           (not (nil? (extract-location-id response)))
-                          (= (:customer (second args))
+                          (= (:customer (first args))
                              (dissoc (:body response) :id))))})
-
-(defn get-customer
-  [id]
-  (get-resource-json (str "/customers/" id)))
 
 (def get-customer-specification
   {:model/args (fn [state]
@@ -74,8 +84,10 @@
    :real/command #'get-customer
    :real/postcondition (fn [prev-state _ args response]
                          (let [id (:id (:body response))]
-                            (if (some #{id} (:customer-ids prev-state))
-                             (= 200 (:status response))
+                           (if (some #{id} (:customer-ids prev-state))
+                             (and
+                              (= 200 (:status response))
+                              (some #{(:body response)} (:customers prev-state)))
                              (= 404 (:status response)))))})
 
 (def customer-resource-specification
@@ -84,7 +96,7 @@
    :initial-state (constantly {:customers [] :customer-ids []})})
 
 (deftest check-customer-resource-specification
-  (is (specification-correct? customer-resource-specification {:num-tests 10})))
+  (is (specification-correct? customer-resource-specification {:num-tests 100})))
 
 
 (comment
