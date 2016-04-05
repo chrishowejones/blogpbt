@@ -28,9 +28,11 @@
 
 (defroutes app-routes
   (GET "/customers/:id" [id]
+       (println "get = " id)
        (get-customer id))
   (POST "/customers" [customer]
         (let [stored-customer (store-customer customer)]
+          (println "Customer posted for id = " (:id stored-customer))
           (-> (resp/created (str "/customers/" (:id stored-customer)) stored-customer)
               (resp/content-type  "application/json"))))
   (route/not-found "Not Found"))

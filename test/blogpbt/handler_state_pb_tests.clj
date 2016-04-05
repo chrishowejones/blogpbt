@@ -46,20 +46,42 @@
 
 ;; stateful tests of customers api
 
-
-
 ;; model customer data in map - initial state is map of the model of customers
 
 (def post-customer-specification
   {:model/args (fn [state]
                  [(gen/return "/customers") (gen/fmap (fn [cust] {:customer cust}) customer)])
    :real/command #'post-resource-json
-   :next-state (fn [state args response]
-                      (update-in state [:customers] conj (:body response)))})
+   :next-state (fn [state _ response]
+                 (let [new-state (update-in state [:customers] conj (:body response))]
+                   (update-in new-state [:customer-ids] conj (:id (:body response)))))
+   :real/postcondition (fn [_ _ args response]
+                         (and
+                          (= 201 (:status response))
+                          (not (nil? (extract-location-id response)))
+                          (= (:customer (second args))
+                             (dissoc (:body response) :id))))})
+
+(defn get-customer
+  [id]
+  (get-resource-json (str "/customers/" id)))
+
+(def get-customer-specification
+  {:model/args (fn [state]
+                 (if (not-empty (:customers state))
+                   [(gen/elements (:customer-ids state))]
+                   [gen/int]))
+   :real/command #'get-customer
+   :real/postcondition (fn [prev-state _ args response]
+                         (let [id (:id (:body response))]
+                            (if (some #{id} (:customer-ids prev-state))
+                             (= 200 (:status response))
+                             (= 404 (:status response)))))})
 
 (def customer-resource-specification
-  {:commands {:post #'post-customer-specification}
-   :initial-state (constantly {:customers []})})
+  {:commands {:post #'post-customer-specification
+              :get  #'get-customer-specification}
+   :initial-state (constantly {:customers [] :customer-ids []})})
 
 (deftest check-customer-resource-specification
   (is (specification-correct? customer-resource-specification {:num-tests 10})))
@@ -68,6 +90,14 @@
 (comment
 
   (clojure.test/run-tests 'blogpbt.handler-state-pb-tests)
-  (post-resource-json "/customers" {:customer {:name "Ã" :email nil, :age 94}})
+  (:body (post-resource-json "/customers" {:customer {:name "Ã" :email nil, :age 94}}))
+
+  (defn test-update [state _ response]
+    (let [new-state (update-in state [:customers] conj (:body response))]
+      (if-let [cust-id (extract-location-id response)]
+        (update-in new-state [:customer-ids] conj cust-id)
+        new-state)))
+
+  (test-update {:customers [] :customer-ids []} nil (post-resource-json "/customers" {:customer {:name "Chris"}}))
 
   )
