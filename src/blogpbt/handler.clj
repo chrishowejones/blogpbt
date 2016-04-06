@@ -41,7 +41,7 @@
     (if customer
       (do
         (swap! datastore assoc-in [:customers id] nil)
-       (resp/status (resp/response nil) 204))
+        (resp/status (resp/response nil) 204))
       not-found)))
 
 (defroutes app-routes

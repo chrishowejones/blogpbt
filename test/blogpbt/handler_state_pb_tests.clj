@@ -74,7 +74,8 @@
    :next-state (fn [state _ {:keys [body]}]
                  (-> state
                      (update-in [:customers] conj body)
-                     (update-in [:customer-ids] conj (:id body))))
+                     (update-in [:customer-ids] conj (:id body))
+                     (update-in [:all-customer-ids] conj (:id body))))
    :real/postcondition (fn [_ _ args {:keys [status body] :as response}]
                          (and
                           (= 201 status)
@@ -98,8 +99,8 @@
 
 (def delete-customer-specification
   {:model/args (fn [state]
-                 (if (seq (:customer-ids state))
-                   [(gen/elements (:customer-ids state))]
+                 (if (seq (:all-customer-ids state))
+                   [(gen/elements (:all-customer-ids state))]
                    [gen/int]))
    :real/command #'delete-customer
    :next-state (fn [state args _]
@@ -119,7 +120,7 @@
   {:commands {:post #'post-customer-specification
               :get  #'get-customer-specification
               :delete #'delete-customer-specification}
-   :initial-state (constantly {:customers [] :customer-ids []})})
+   :initial-state (constantly {:customers [] :customer-ids [] :all-customer-ids []})})
 
 (deftest check-customer-resource-specification
   (is (specification-correct? customer-resource-specification {:num-tests 300})))
