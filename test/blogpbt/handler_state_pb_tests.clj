@@ -104,8 +104,11 @@
    :real/command #'delete-customer
    :next-state (fn [state args _]
                  (let [id (first args)]
-                   (assoc state :customer-ids
-                          (vec (filter #(not= % id) (:customer-ids state))))))
+                   (-> state
+                    (assoc :customer-ids
+                           (vec (filter #(not= % id) (:customer-ids state))))
+                    (assoc :customers
+                           (vec (filter #(not= (:id %) id) (:customers state)))))))
    :real/postcondition (fn [{:keys [customer-ids]} _ args {:keys [status]}]
                          (let [id (first args)]
                            (if (some #{id} customer-ids)
@@ -138,4 +141,5 @@
   (delete-customer "547ae821-85df-4a53-bd0e-805b63ab93f8")
   (def test-state {:customer-ids ["1" "2" "3"]})
   (assoc test-state :customer-ids (filter #(not= % "2") (:customer-ids test-state)))
+
   )
