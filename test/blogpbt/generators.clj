@@ -28,18 +28,16 @@
   (gen/hash-map :name gen/string :email email-gen :age (gen/choose 10 100)))
 
 ;; Generators for addresses
-(defn single-line-address [customer-id]
-  (gen/hash-map :customer-id (gen/return customer-id)
-                :number gen/pos-int
+(def single-line-address
+  (gen/hash-map :number gen/pos-int
                 :line1 gen/string-alphanumeric
                 :postcode postcode-gen))
 
-(defn two-line-address [customer-id]
-  (gen/hash-map :customer-id (gen/return customer-id)
-                :number gen/pos-int
+(def two-line-address
+  (gen/hash-map :number gen/pos-int
                 :line1 gen/string-alphanumeric
                 :line2 gen/string-alphanumeric
                 :postcode postcode-gen))
 
-(defn address [customer-id]
-  (gen/frequency [[7 (single-line-address customer-id)] [3 (two-line-address customer-id)]]))
+(def address
+  (gen/frequency [[7 single-line-address] [3 two-line-address]]))

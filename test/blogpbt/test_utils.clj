@@ -24,9 +24,17 @@
       app
       (parse-json-body)))
 
-(defn extract-location-id
+(defn- parse-location-id
+  [re response]
+  (second (re-find re (get-in response [:headers "Location"]))))
+
+(defn extract-customer-location-id
   [response]
-  (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"]))))
+  (parse-location-id #"customers/([0-9|-[a-f]]+)" response))
+
+(defn extract-address-location-id
+  [response]
+  (parse-location-id #"customers/[0-9|-[a-f]]+/addresses/([0-9|-[a-f]]+)" response))
 
 (defn delete-resource-json [url id]
   (app (mock/request :delete (str url id))))
@@ -34,5 +42,6 @@
 (comment
 
   (delete-resource-json "/customers" 123)
+  (extract-customer-location-id (post-resource-json "/customers" {:name "fred"}))
 
   )

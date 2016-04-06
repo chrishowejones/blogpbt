@@ -2,7 +2,7 @@
   "Stateful property based tests"
   (:require [blogpbt
              [generators :refer [customer]]
-             [test-utils :refer [delete-resource-json extract-location-id get-resource-json post-resource-json]]]
+             [test-utils :refer [delete-resource-json extract-customer-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer [deftest is]]
             [clojure.test.check.generators :as gen]
             [stateful-check.core :refer [specification-correct?]]))
@@ -78,7 +78,7 @@
    :real/postcondition (fn [_ _ args {:keys [status body] :as response}]
                          (and
                           (= 201 status)
-                          (not (nil? (extract-location-id response)))
+                          (not (nil? (extract-customer-location-id response)))
                           (= (:customer (first args))
                              (dissoc body :id))))})
 

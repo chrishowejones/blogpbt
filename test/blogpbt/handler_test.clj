@@ -2,7 +2,7 @@
   (:require [blogpbt
              [generators :refer [customer]]
              [handler :refer :all]
-             [test-utils :refer [delete-resource-json extract-location-id get-resource-json post-resource-json]]]
+             [test-utils :refer [delete-resource-json extract-address-location-id extract-customer-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer :all]
             [clojure.test.check
              [clojure-test :refer [defspec]]
@@ -15,12 +15,12 @@
   (testing "customer post route"
     (let [response (post-resource-json "/customers" {:customer {:name "Fred"}})]
       (is (= (:status response) 201))
-      (is (= (into {:id (extract-location-id response)} {:name "Fred"}) (:body response)))))
+      (is (= (into {:id (extract-customer-location-id response)} {:name "Fred"}) (:body response)))))
 
   (testing "customer get route"
     (let [id (->
               (post-resource-json "/customers" {:customer {:name "Fred"}})
-              (extract-location-id))
+              (extract-customer-location-id))
           response (get-resource-json (str "/customers/" id))]
       (is (= (:status response) 200))
       (is (= (:body response) {:id id :name "Fred"}))))
@@ -28,12 +28,23 @@
   (testing "customer delete route"
     (let [id (->
               (post-resource-json "/customers" {:customer {:name "Fred"}})
-              (extract-location-id))]
+              (extract-customer-location-id))]
       (is (= (:status (delete-resource-json "/customers/" id)) 204))))
 
   (testing "not-found route"
     (let [response (app (mock/request :get "/invalid"))]
       (is (= (:status response) 404)))))
+
+(deftest test-customer-address
+  (testing "Add an address to a customer"
+    (let [address {:number 10 :line1 "Downing St" :postcode "SW1A 2AA"}
+          response (-> (post-resource-json "/customers" {:customer {:name "Fred"}})
+                       extract-customer-location-id
+                       (#(str "/customers/" %  "/addresses"))
+                       (post-resource-json {:address address}))]
+      (is (= (:status response) 201))
+      (is (= (extract-address-location-id response)))
+      (is (= (dissoc (:body response) :id) address)))))
 
 (deftest test-customer
   (let [response (post-resource-json "/customers" {:customer {:name "", :email "p9@googlemail.com", :age 48}})]
@@ -91,5 +102,9 @@
   (post-helper-json "/customers" {:customer {:name "Fred"}})
   (app (mock/content-type (mock/request :post "/customers" (generate-string {:customer {:name "Fred"}})) "application/json"))
 
+  (-> (post-resource-json "/customers" {:customer {:name "Fred"}})
+                       extract-location-id
+                       (#(str "/customers/" %  "/addresses"))
+                       (post-resource-json {:address {:number 10 :line1 "Downing St" :postcode "SW1A 2AA"}}))
 
   )

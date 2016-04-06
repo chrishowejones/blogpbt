@@ -41,21 +41,34 @@
     (if customer
       (do
         (swap! datastore assoc-in [:customers id] nil)
-       (resp/status (resp/response nil) 204))
+        (resp/status (resp/response nil) 204))
+      not-found)))
+
+(defn- store-address [cust-id address]
+  (let [customer (get-in @datastore [:customers cust-id])
+        uuid (str (java.util.UUID/randomUUID))
+        address-with-id (assoc address :id uuid)]
+    (if customer
+      (do
+        (swap! datastore assoc-in [:customers cust-id :addresses uuid] address-with-id)
+        (-> (resp/created (str "/customers/" cust-id "/addresses/" uuid) address-with-id)
+            (resp/content-type "application/json")))
       not-found)))
 
 (defroutes app-routes
   (GET "/customers/:id" [id]
-       (debug "Get customer for id:" id)
+       (debug "get customer for id:" id)
        (get-customer id))
   (POST "/customers" [customer]
         (let [stored-customer (store-customer customer)]
-          (debug "Customer posted for id:" (:id stored-customer))
+          (debug "customer posted for id:" (:id stored-customer))
           (-> (resp/created (str "/customers/" (:id stored-customer)) stored-customer)
-              (resp/content-type  "application/json"))))
+              (resp/content-type "application/json"))))
   (DELETE "/customers/:id" [id]
-          (debug "Delete customer for id:" id)
+          (debug "delete customer for id:" id)
           (delete-customer id))
+  (POST "/customers/:cust-id/addresses" [cust-id address]
+        (store-address cust-id address))
   (route/not-found "Not Found"))
 
 (def app
@@ -72,7 +85,9 @@
   (app (ring.mock.request/request :get "/customers/1"))
   (app (ring.mock.request/content-type (ring.mock.request/request :post "/customers" (cheshire.core/generate-string {:customer {:name "bob"}})) "application/json"))
 
-
-
+  (def datastore (atom {:customers {"1" {:id "1" :name "Fred"}}}))
+  @datastore
+  (swap! datastore2 assoc-in [:customers "1" :addresses "addr2"] {:id "addr2" :line "Line1"})
+  (store-address "1" {:line1 "line1" :number "12"})
 
   )
