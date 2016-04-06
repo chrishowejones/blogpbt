@@ -1,9 +1,10 @@
 (ns blogpbt.handler-state-pb-tests
   "Stateful property based tests"
-  (:require [blogpbt.generators :refer [customer]]
+  (:require [blogpbt
+             [generators :refer [customer]]
+             [test-utils :refer [delete-resource-json extract-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer [deftest is]]
             [clojure.test.check.generators :as gen]
-            [blogpbt.test-utils :refer [extract-location-id post-resource-json get-resource-json]]
             [stateful-check.core :refer [specification-correct?]]))
 
 (defn new-queue []
@@ -47,13 +48,17 @@
 ;; stateful tests of customers api
 
 ;; helper functions to call post and get with a single argument
-(defn get-customer
+(defn- get-customer
   [id]
   (get-resource-json (str "/customers/" id)))
 
-(defn post-customer
+(defn- post-customer
   [customer]
   (post-resource-json (str "/customers") customer))
+
+(defn- delete-customer
+  [id]
+  (delete-resource-json "/customers/" id))
 
 ;; model server side customer state data in a map
 ;; The map will contain a vector of generated customer maps and a vector of customer ids
@@ -63,40 +68,58 @@
 ;;  :customer-ids ["f64dcd17-e5d8-4219-b101-eba94f1ddaff" "d26c9ed4-dbf3-4525-9946-aaa794d1fe6e"]
 
 (def post-customer-specification
-  {:model/args (fn [state]
+  {:model/args (fn [_]
                  [(gen/fmap (fn [cust] {:customer cust}) customer)])
    :real/command #'post-customer
-   :next-state (fn [state _ response]
-                 (let [new-state (update-in state [:customers] conj (:body response))]
-                   (update-in new-state [:customer-ids] conj (:id (:body response)))))
-   :real/postcondition (fn [_ _ args response]
+   :next-state (fn [state _ {:keys [body]}]
+                 (-> state
+                     (update-in [:customers] conj body)
+                     (update-in [:customer-ids] conj (:id body))))
+   :real/postcondition (fn [_ _ args {:keys [status body] :as response}]
                          (and
-                          (= 201 (:status response))
+                          (= 201 status)
                           (not (nil? (extract-location-id response)))
                           (= (:customer (first args))
-                             (dissoc (:body response) :id))))})
+                             (dissoc body :id))))})
 
 (def get-customer-specification
   {:model/args (fn [state]
-                 (if (not-empty (:customers state))
+                 (if (seq (:customer-ids state))
                    [(gen/elements (:customer-ids state))]
                    [gen/int]))
    :real/command #'get-customer
-   :real/postcondition (fn [prev-state _ args response]
-                         (let [id (:id (:body response))]
-                           (if (some #{id} (:customer-ids prev-state))
+   :real/postcondition (fn [{:keys [customer-ids customers]} _ args {:keys [status body]}]
+                         (let [id (:id body)]
+                           (if (some #{id} customer-ids)
                              (and
-                              (= 200 (:status response))
-                              (some #{(:body response)} (:customers prev-state)))
-                             (= 404 (:status response)))))})
+                              (= 200 status)
+                              (some #{body} customers))
+                             (= 404 status))))})
+
+(def delete-customer-specification
+  {:model/args (fn [state]
+                 (if (seq (:customer-ids state))
+                   [(gen/elements (:customer-ids state))]
+                   [gen/int]))
+   :real/command #'delete-customer
+   :next-state (fn [state args _]
+                 (let [id (first args)]
+                   (assoc state :customer-ids
+                          (vec (filter #(not= % id) (:customer-ids state))))))
+   :real/postcondition (fn [{:keys [customer-ids]} _ args {:keys [status]}]
+                         (let [id (first args)]
+                           (if (some #{id} customer-ids)
+                             (= 204 status)
+                             (= 404 status))))})
 
 (def customer-resource-specification
   {:commands {:post #'post-customer-specification
-              :get  #'get-customer-specification}
+              :get  #'get-customer-specification
+              :delete #'delete-customer-specification}
    :initial-state (constantly {:customers [] :customer-ids []})})
 
 (deftest check-customer-resource-specification
-  (is (specification-correct? customer-resource-specification {:num-tests 100})))
+  (is (specification-correct? customer-resource-specification {:num-tests 300})))
 
 
 (comment
@@ -111,5 +134,8 @@
         new-state)))
 
   (test-update {:customers [] :customer-ids []} nil (post-resource-json "/customers" {:customer {:name "Chris"}}))
-
+  (post-customer {:customer {:name "Chris"}})
+  (delete-customer "547ae821-85df-4a53-bd0e-805b63ab93f8")
+  (def test-state {:customer-ids ["1" "2" "3"]})
+  (assoc test-state :customer-ids (filter #(not= % "2") (:customer-ids test-state)))
   )

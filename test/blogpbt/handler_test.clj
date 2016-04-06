@@ -2,7 +2,7 @@
   (:require [blogpbt
              [generators :refer [customer]]
              [handler :refer :all]
-             [test-utils :refer [extract-location-id get-resource-json post-resource-json]]]
+             [test-utils :refer [delete-resource-json extract-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer :all]
             [clojure.test.check
              [clojure-test :refer [defspec]]
@@ -24,6 +24,12 @@
           response (get-resource-json (str "/customers/" id))]
       (is (= (:status response) 200))
       (is (= (:body response) {:id id :name "Fred"}))))
+
+  (testing "customer delete route"
+    (let [id (->
+              (post-resource-json "/customers" {:customer {:name "Fred"}})
+              (extract-location-id))]
+      (is (= (:status (delete-resource-json "/customers/" id)) 204))))
 
   (testing "not-found route"
     (let [response (app (mock/request :get "/invalid"))]

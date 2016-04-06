@@ -35,15 +35,27 @@
            (resp/content-type (resp/response customer-found) "application/json")
            not-found)))
 
+(defn- delete-customer
+  [id]
+  (let [customer (get-in @datastore [:customers id])]
+    (if customer
+      (do
+        (swap! datastore assoc-in [:customers id] nil)
+       (resp/status (resp/response nil) 204))
+      not-found)))
+
 (defroutes app-routes
   (GET "/customers/:id" [id]
-       (debug "get customer for id:" id)
+       (debug "Get customer for id:" id)
        (get-customer id))
   (POST "/customers" [customer]
         (let [stored-customer (store-customer customer)]
           (debug "Customer posted for id:" (:id stored-customer))
           (-> (resp/created (str "/customers/" (:id stored-customer)) stored-customer)
               (resp/content-type  "application/json"))))
+  (DELETE "/customers/:id" [id]
+          (debug "Delete customer for id:" id)
+          (delete-customer id))
   (route/not-found "Not Found"))
 
 (def app

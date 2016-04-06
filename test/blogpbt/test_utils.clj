@@ -27,3 +27,12 @@
 (defn extract-location-id
   [response]
   (second (re-find #"customers/([0-9|-[a-f]]+)" (get-in response [:headers "Location"]))))
+
+(defn delete-resource-json [url id]
+  (app (mock/request :delete (str url id))))
+
+(comment
+
+  (delete-resource-json "/customers" 123)
+
+  )
