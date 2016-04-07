@@ -43,13 +43,13 @@
                        (#(str "/customers/" %  "/addresses"))
                        (post-resource-json {:address address}))]
       (is (= (:status response) 201))
-      (is (= (extract-address-location-id response)))
+      (is (= (extract-address-location-id response) (get-in response [:body :id])))
       (is (= (dissoc (:body response) :id) address)))))
 
 (deftest test-customer
   (let [response (post-resource-json "/customers" {:customer {:name "", :email "p9@googlemail.com", :age 48}})]
     (is (= 201 (:status response)))
-    (is (not (nil? (extract-location-id response))))))
+    (is (not (nil? (extract-customer-location-id response))))))
 
 ;; Property based tests
 
@@ -63,7 +63,7 @@
   1000
   (prop/for-all [cust customer]
                 (let [response (post-resource-json "/customers" {:customer cust})
-                      location-id (extract-location-id response)]
+                      location-id (extract-customer-location-id response)]
                   (and
                    (not (nil? location-id))
                    (= (:id (:body response))
@@ -75,16 +75,16 @@
   1000
   (prop/for-all [cust customer]
                 (let [response (post-resource-json "/customers" {:customer cust})
-                      id (extract-location-id response)]
+                      id (extract-customer-location-id response)]
                   (let [snd-response (post-resource-json "/customers" {:customer cust})]
                     (and (= 201 (:status snd-response))
-                         (not= id (extract-location-id snd-response)))) ; post is not idempotent
+                         (not= id (extract-customer-location-id snd-response)))) ; post is not idempotent
                   )))
 
 (deftest test-get-customer-exists
   (chuck/checking "checking that customer exists" 1000
                   [cust customer]
-                  (let [id (extract-location-id (post-resource-json "/customers" {:customer cust}))
+                  (let [id (extract-customer-location-id (post-resource-json "/customers" {:customer cust}))
                         customer-retrieved (get-resource-json (str "/customers/" id))]
                     (is (= 200 (:status customer-retrieved)))
                     (is (= cust (dissoc (:body customer-retrieved) :id))))))
