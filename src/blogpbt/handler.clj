@@ -40,7 +40,7 @@
   (let [customer (get-in @datastore [:customers id])]
     (if customer
       (do
-        (swap! datastore assoc-in [:customers id] nil)
+        (swap! datastore update-in [:customers] dissoc id)
         (resp/status (resp/response nil) 204))
       not-found)))
 
