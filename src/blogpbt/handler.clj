@@ -28,9 +28,14 @@
     (swap! datastore assoc-in [:customers uuid] cust-with-id)
     cust-with-id))
 
+(defn- find-customer
+  [id]
+  (-> (get-in @datastore [:customers id])
+      (dissoc :addresses)))
+
 (defn- get-customer
   [id]
-  (let [customer-found (get-in @datastore [:customers id])]
+  (let [customer-found (find-customer id)]
          (if customer-found
            (resp/content-type (resp/response customer-found) "application/json")
            not-found)))
