@@ -1,7 +1,7 @@
 (ns blogpbt.handler-state-pb-tests
   "Stateful property based tests"
   (:require [blogpbt
-             [generators :refer [customer]]
+             [generators :refer [address customer]]
              [test-utils :refer [delete-resource-json extract-customer-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer [deftest is]]
             [clojure.test.check.generators :as gen]
@@ -60,6 +60,10 @@
   [id]
   (delete-resource-json "/customers/" id))
 
+(defn- post-address
+  [cust-id address]
+  (post-resource-json (str "/customers/" cust-id "/addresses") address))
+
 ;; model server side customer state data in a map
 ;; The map will contain a vector of generated customer maps and a vector of customer ids
 ;; returned from calls to POST on the server.
@@ -116,14 +120,27 @@
                              (= 204 status)
                              (= 404 status))))})
 
+(def post-address-specification
+  {:model/requires (fn [state]
+                     (seq (:customer-ids state)))
+   :model/args (fn [state]
+                 [(gen/elements (:customer-ids state)) address])
+   :real/command #'post-address
+   :real/postcondition (fn [_ _ args {:keys [status body]}]
+                         (= 201 status))
+   })
+
 (def customer-resource-specification
   {:commands {:post #'post-customer-specification
               :get  #'get-customer-specification
-              :delete #'delete-customer-specification}
+              :delete #'delete-customer-specification
+              :post-address #'post-address-specification}
    :initial-state (constantly {:customers [] :customer-ids [] :all-customer-ids []})})
 
 (deftest check-customer-resource-specification
-  (is (specification-correct? customer-resource-specification {:num-tests 300})))
+  (is (specification-correct? customer-resource-specification {:num-tests 200})))
+
+
 
 
 (comment
