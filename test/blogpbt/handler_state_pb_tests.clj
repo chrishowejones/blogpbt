@@ -122,12 +122,15 @@
 
 (def post-address-specification
   {:model/requires (fn [state]
-                     (seq (:customer-ids state)))
+                     (seq (:all-customer-ids state)))
    :model/args (fn [state]
-                 [(gen/elements (:customer-ids state)) address])
+                 [(gen/elements (:all-customer-ids state)) address])
    :real/command #'post-address
-   :real/postcondition (fn [_ _ args {:keys [status body]}]
-                         (= 201 status))
+   :real/postcondition (fn [{:keys [customer-ids]} _ args {:keys [status body]}]
+                         (let [cust-id (first args)]
+                          (if (some #{cust-id} customer-ids)
+                            (= 201 status)
+                            (= 404 status))))
    })
 
 (def customer-resource-specification
