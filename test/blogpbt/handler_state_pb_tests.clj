@@ -72,10 +72,10 @@
                  [(gen/fmap (fn [cust] {:customer cust}) customer)])
    :real/command #'post-customer
    :next-state (fn [state _ {:keys [body]}]
-                 (-> state
-                     (update-in [:customers] conj body)
-                     (update-in [:customer-ids] conj (:id body))
-                     (update-in [:all-customer-ids] conj (:id body))))
+                 (let [id (:id body)]
+                   (-> state
+                       (update-in [:customers] assoc id body)
+                       (update-in [:all-customer-ids] conj id))))
    :real/postcondition (fn [_ _ args {:keys [status body] :as response}]
                          (and
                           (= 201 status)
@@ -85,16 +85,17 @@
 
 (def get-customer-specification
   {:model/args (fn [state]
-                 (if (seq (:customer-ids state))
-                   [(gen/elements (:customer-ids state))]
+                 (if (seq (:all-customer-ids state))
+                   [(gen/frequency [[9 (gen/elements (:all-customer-ids state))]
+                                    [1 gen/int]])]
                    [gen/int]))
    :real/command #'get-customer
-   :real/postcondition (fn [{:keys [customer-ids customers]} _ args {:keys [status body]}]
+   :real/postcondition (fn [{:keys [customers]} _ args {:keys [status body]}]
                          (let [id (:id body)]
-                           (if (some #{id} customer-ids)
+                           (if (customers id)
                              (and
                               (= 200 status)
-                              (some #{body} customers))
+                              (= body (customers id)))
                              (= 404 status))))})
 
 (def delete-customer-specification
@@ -105,14 +106,10 @@
    :real/command #'delete-customer
    :next-state (fn [state args _]
                  (let [id (first args)]
-                   (-> state
-                    (assoc :customer-ids
-                           (vec (filter #(not= % id) (:customer-ids state))))
-                    (assoc :customers
-                           (vec (filter #(not= (:id %) id) (:customers state)))))))
-   :real/postcondition (fn [{:keys [customer-ids]} _ args {:keys [status]}]
+                   (update-in state [:customers] dissoc id)))
+   :real/postcondition (fn [{:keys [customers]} _ args {:keys [status]}]
                          (let [id (first args)]
-                           (if (some #{id} customer-ids)
+                           (if (customers id)
                              (= 204 status)
                              (= 404 status))))})
 
@@ -120,7 +117,7 @@
   {:commands {:post #'post-customer-specification
               :get  #'get-customer-specification
               :delete #'delete-customer-specification}
-   :initial-state (constantly {:customers [] :customer-ids [] :all-customer-ids []})})
+   :initial-state (constantly {:customers {} :all-customer-ids []})})
 
 (deftest check-customer-resource-specification
   (is (specification-correct? customer-resource-specification {:num-tests 300})))
