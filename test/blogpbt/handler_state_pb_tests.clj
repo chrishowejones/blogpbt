@@ -101,7 +101,9 @@
 (def delete-customer-specification
   {:model/args (fn [state]
                  (if (seq (:all-customer-ids state))
-                   [(gen/elements (:all-customer-ids state))]
+                   [(gen/frequency
+                     [[9 (gen/elements (:all-customer-ids state))]
+                      [1 gen/int]])]
                    [gen/int]))
    :real/command #'delete-customer
    :next-state (fn [state args _]
