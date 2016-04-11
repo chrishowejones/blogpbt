@@ -91,7 +91,7 @@
                    [gen/int]))
    :real/command #'get-customer
    :real/postcondition (fn [{:keys [customers]} _ args {:keys [status body]}]
-                         (let [id (:id body)]
+                         (let [id (first args)]
                            (if (customers id)
                              (and
                               (= 200 status)
