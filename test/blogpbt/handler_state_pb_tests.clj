@@ -2,7 +2,7 @@
   "Stateful property based tests"
   (:require [blogpbt
              [generators :refer [address customer]]
-             [test-utils :refer [delete-resource-json extract-customer-location-id get-resource-json post-resource-json]]]
+             [test-utils :refer [delete-resource-json extract-address-location-id extract-customer-location-id get-resource-json post-resource-json]]]
             [clojure.test :refer [deftest is]]
             [clojure.test.check.generators :as gen]
             [stateful-check.core :refer [specification-correct?]]))
@@ -65,8 +65,8 @@
   (post-resource-json (str "/customers/" cust-id "/addresses") address))
 
 (defn- get-address
-  [address-url]
-  (get-resource-json address-url))
+  [[cust-id addr-id]]
+  (get-resource-json (str "/customers/" cust-id "/addresses/" addr-id)))
 
 ;; model server side customer state data in a map
 ;; The map will contain a vector of generated customer maps and a vector of customer ids
@@ -98,7 +98,7 @@
                                     [1 gen/int]])]
                    [gen/int]))
    :real/command #'get-customer
-   :real/postcondition (fn [{:keys [customers]} _ args {:keys [status body]}]
+   :real/postcondition (fn [{:keys [customers addresses]} _ args {:keys [status body]}]
                          (let [id (first args)]
                            (if (customers id)
                              (and
@@ -128,36 +128,36 @@
    :model/args (fn [state]
                  [(gen/elements (:all-customer-ids state)) (gen/fmap #(hash-map :address %) address)])
    :real/command #'post-address
-   :next-state (fn [state args {:keys [body status headers]}]
-                 (let [cust-id (first args)
-                       addr-id (:id body)
-                       location-url (get headers "Location")]
-                   (if (= 201 status)
-                     (let [new-state (-> state
-                                         (update-in [:customers cust-id :addresses] assoc addr-id body)
-                                         (update-in [:addresses] assoc location-url body))]
-                       state)
-                     state)))
-   :real/postcondition (fn [{:keys [customers]} _ args {:keys [status body]}]
-                         (let [cust-id (first args) address (:address (second args))]
+   :next-state (fn [state args {:keys [headers body status] :as response}]
+                 (update-in state [:addresses] assoc [(first args) (:id body)]
+                            body))
+   :real/postcondition (fn [{:keys [customers]} {:keys [addresses]} args {:keys [status body] :as response}]
+                         (let [cust-id (first args)
+                               address (:address (second args))]
                            (if (customers cust-id)
                              (do
                                (and
                                 (= 201 status)
-                                (= address (dissoc body :id))))
+                                (= (dissoc body :id)
+                                   address)
+                                (= body (get addresses [cust-id (body :id)]))))
                              (= 404 status))))})
 
 (def get-address-specification
   {:model/args (fn [state]
-                 (let [addresses (:addresses state)]
+                 (let [addresses (get state :addresses)]
                    (if (seq addresses)
                      [(gen/elements (keys addresses))]
-                     [gen/string-alphanumeric])))
+                     [(gen/tuple gen/string-alphanumeric gen/string-alphanumeric)])))
    :real/command #'get-address
-   :real/postcondition (fn [{:keys [addresses]} _ args {:keys [status]}]
-                         (let [address-url (first args)]
-                           (if (addresses address-url)
-                             (= 200 status)
+   :real/postcondition (fn [{:keys [customers addresses]} _ args {:keys [status body] :as response}]
+                         (let [[cust-id addr-id] (first args)
+                               address (get addresses [cust-id addr-id])]
+                           (if (and address
+                                    (get customers cust-id))
+                             (and
+                              (= 200 status)
+                              (= address body))
                              (= 404 status))))})
 
 (def customer-resource-specification
@@ -169,7 +169,7 @@
    :initial-state (constantly {:customers {} :all-customer-ids [] :addresses {}})})
 
 (deftest check-customer-resource-specification
-  (is (specification-correct? customer-resource-specification {:num-tests 100})))
+  (is (specification-correct? customer-resource-specification {:num-tests 500})))
 
 
 

@@ -30,15 +30,23 @@
 
 (defn- find-customer
   [id]
-  (-> (get-in @datastore [:customers id])
-      (dissoc :addresses)))
+  (-> (get-in @datastore [:customers id])))
 
 (defn- get-customer
   [id]
-  (let [customer-found (find-customer id)]
+  (let [customer-found (dissoc (find-customer id) :addresses)]
          (if customer-found
            (resp/content-type (resp/response customer-found) "application/json")
            not-found)))
+
+(defn- get-address [cust-id addr-id]
+  (let [customer (find-customer cust-id)]
+    (debug "Customer found=" customer)
+    (if customer
+      (let [address (get-in customer [:addresses addr-id])]
+        (debug "Address found=" address)
+        (resp/content-type (resp/response address) "application/json"))
+      not-found)))
 
 (defn- delete-customer
   [id]
@@ -53,6 +61,7 @@
   (let [customer (get-in @datastore [:customers cust-id])
         uuid (str (java.util.UUID/randomUUID))
         address-with-id (assoc address :id uuid)]
+    (debug "Address with id =" address-with-id)
     (if customer
       (do
         (swap! datastore assoc-in [:customers cust-id :addresses uuid] address-with-id)
@@ -74,6 +83,9 @@
           (delete-customer id))
   (POST "/customers/:cust-id/addresses" [cust-id address]
         (store-address cust-id address))
+  (GET "/customers/:cust-id/addresses/:addr-id"
+       [cust-id addr-id]
+       (get-address cust-id addr-id))
   (route/not-found "Not Found"))
 
 (def app
@@ -93,6 +105,8 @@
   (def datastore (atom {:customers {"1" {:id "1" :name "Fred"}}}))
   @datastore
   (swap! datastore2 assoc-in [:customers "1" :addresses "addr2"] {:id "addr2" :line "Line1"})
-  (store-address "1" {:line1 "line1" :number "12"})
+  (store-address "10f758de-f154-4258-9288-2741fb913f96" {:line1 "line1" :number "12"})
+
+
 
   )
